@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify, send_from_directory, url_for
+import os
+import random
+import json
+from flask import Flask, request, jsonify, send_from_directory, url_for, Response, stream_with_context
 from flask_cors import CORS
 from ultralytics import YOLO
-import os
 import cv2
 import json
 from pymongo import MongoClient
@@ -9,6 +11,7 @@ from bson.objectid import ObjectId
 import datetime
 import rasterio
 from rasterio.errors import RasterioIOError
+import logging
 
 # Flask app setup
 app = Flask(__name__)
@@ -17,13 +20,19 @@ CORS(app)
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_DIR = 'outputs'
+IMAGES_FOLDER = 'images'  # Folder for real-time analysis images
 WEIGHTS = "best_landfill_seg.pt"
 CONF_THRESH = 0.25
 IOU_THRESH = 0.45
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tif', 'tiff'}
 
+# Add to app.config
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['OUTPUT_DIR'] = OUTPUT_DIR
+app.config['IMAGES_FOLDER'] = IMAGES_FOLDER
+
 # Ensure directories exist
-for folder in [UPLOAD_FOLDER, OUTPUT_DIR]:
+for folder in [UPLOAD_FOLDER, OUTPUT_DIR, IMAGES_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
@@ -35,10 +44,42 @@ images_collection = db['images']
 # Load YOLO model
 model = YOLO(WEIGHTS)
 
+# Sample demo data
+demo_data = {
+    "detections": [
+        {
+            "id": "demo1",
+            "type": "FULL container",
+            "confidence": 0.95,
+            "location": {"lat": 40.7128, "lng": -74.0060},
+            "area": 150.5,
+            "dateDetected": datetime.datetime.now().isoformat(),
+            "boundingBox": {
+                "topLeft": {"lat": 40.7128, "lng": -74.0060},
+                "bottomRight": {"lat": 40.7130, "lng": -74.0058}
+            },
+            "segmentation": [],
+            "image": "demo-image-1.jpg"
+        },
+        {
+            "id": "demo2",
+            "type": "PARTIAL container",
+            "confidence": 0.82,
+            "location": {"lat": 40.7140, "lng": -74.0070},
+            "area": 75.2,
+            "dateDetected": datetime.datetime.now().isoformat(),
+            "boundingBox": {
+                "topLeft": {"lat": 40.7140, "lng": -74.0070},
+                "bottomRight": {"lat": 40.7142, "lng": -74.0068}
+            },
+            "segmentation": [],
+            "image": "demo-image-2.jpg"
+        }
+    ]
+}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def extract_georeferencing(image_path):
     """Extract georeferencing information from the image using rasterio."""
@@ -52,7 +93,6 @@ def extract_georeferencing(image_path):
         print(f"Could not extract georeferencing for {image_path}: {e}")
         # Fallback to mock values for non-georeferenced images
         return None, 0.1  # Mock scaling factor: 0.1 meters per pixel
-
 
 def process_image(image_path):
     """Process an image with the YOLO model and return annotations and annotated image paths."""
@@ -135,7 +175,6 @@ def process_image(image_path):
 
     return out_json, out_img
 
-
 def save_to_db(filename, out_json, out_img):
     """Save image metadata and results to MongoDB."""
     with open(out_json) as f:
@@ -150,7 +189,6 @@ def save_to_db(filename, out_json, out_img):
     }
     result = images_collection.insert_one(image_doc)
     return str(result.inserted_id)
-
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -196,7 +234,6 @@ def get_images():
         })
     return jsonify(images_list), 200
 
-
 @app.route('/images/<image_id>', methods=['GET'])
 def get_image_details(image_id):
     """Retrieve details of a specific processed image."""
@@ -223,13 +260,12 @@ def get_image_details(image_id):
                     "topLeft": {"lat": ann["box"][1], "lng": ann["box"][0]},
                     "bottomRight": {"lat": ann["box"][3], "lng": ann["box"][2]}
                 },
-                "segmentation": ann.get("segmentation", []),  # Add segmentation data
+                "segmentation": ann.get("segmentation", []),
                 "dateDetected": img["processed_at"].isoformat()
             }
             for ann in img["annotations"]["annotations"]
         ]
     }), 200
-
 
 @app.route('/images/<image_id>', methods=['DELETE'])
 def delete_image(image_id):
@@ -258,18 +294,100 @@ def delete_image(image_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     """Serve original uploaded images."""
     return send_from_directory(UPLOAD_FOLDER, filename)
-
 
 @app.route('/outputs/<path:filename>')
 def output_file(filename):
     """Serve annotated images."""
     return send_from_directory(OUTPUT_DIR, filename)
 
+@app.route('/realtime', methods=['GET'])
+def real_time_analysis():
+    """Stream real-time analysis results for all images in the folder."""
+    def generate():
+        try:
+            image_files = [
+                f for f in os.listdir(app.config['IMAGES_FOLDER'])
+                if os.path.isfile(os.path.join(app.config['IMAGES_FOLDER'], f))
+            ]
+            if not image_files:
+                yield json.dumps({"error": "No images found"}) + "\n"
+                return
+
+            total_detections = 0
+            first_detection_found = False
+
+            for selected in image_files:
+                path = os.path.join(app.config['IMAGES_FOLDER'], selected)
+                img = cv2.imread(path)
+                if img is None:
+                    yield json.dumps({"image": selected, "error": "Invalid image file"}) + "\n"
+                    continue
+
+                results = model.predict(img, save=False)[0]
+                boxes = results.boxes.xyxy.cpu().numpy()
+                scores = results.boxes.conf.cpu().numpy()
+                classes = results.boxes.cls.cpu().numpy()
+                names = results.names
+
+                detections = []
+                for (x1, y1, x2, y2), score, cls in zip(boxes, scores, classes):
+                    detection = {
+                        "location": {
+                            "lat": float((y1 + y2) / 2),
+                            "lng": float((x1 + x2) / 2)
+                        },
+                        "area": float((x2 - x1) * (y2 - y1)),
+                        "confidence": float(score),
+                        "type": names[int(cls)]
+                    }
+                    detections.append(detection)
+
+                total_detections += len(detections)
+                if not first_detection_found and len(detections) > 0:
+                    first_detection_found = True
+                    yield json.dumps({"firstDetection": True}) + "\n"
+
+                # Send the results for this image
+                yield json.dumps({
+                    "image": selected,
+                    "detections": detections
+                }) + "\n"
+
+            # Send completion message with total detections
+            yield json.dumps({
+                "completed": True,
+                "totalDetections": total_detections
+            }) + "\n"
+
+        except Exception as e:
+            app.logger.error(f"Error during real-time analysis: {e}")
+            yield json.dumps({"error": str(e)}) + "\n"
+
+    return Response(stream_with_context(generate()), mimetype='application/json')
+
+@app.route('/images-list', methods=['GET'])
+def get_images_list():
+    """Retrieve the list of images in the IMAGES_FOLDER."""
+    try:
+        image_files = [
+            f for f in os.listdir(app.config['IMAGES_FOLDER'])
+            if os.path.isfile(os.path.join(app.config['IMAGES_FOLDER'], f))
+        ]
+        return jsonify({"images": image_files}), 200
+    except Exception as e:
+        app.logger.error(f"Error retrieving image list: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/demo', methods=['GET'])
+def demo():
+    try:
+        return jsonify(demo_data), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch demo data: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -12,6 +12,12 @@ interface AppContextType {
   processedImages: ProcessedImage[];
   activeImageId: string | null;
   uploadedFiles: File[];
+  firstDetectionFound: boolean;
+  totalDetections: number;
+  currentPage: string;
+  setCurrentPage: (page: string) => void;
+  setFirstDetectionFound: (value: boolean) => void;
+  setTotalDetections: (value: number) => void;
   setUploadedFiles: (files: File[]) => void;
   addDetection: (detection: Detection) => void;
   removeDetection: (id: string) => void;
@@ -27,6 +33,7 @@ interface AppContextType {
   fetchHistory: () => Promise<void>;
   resetProcessingState: () => void;
   deleteImage: (imageId: string) => Promise<void>;
+  resetNotifications: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -40,10 +47,45 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([]);
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [firstDetectionFound, setFirstDetectionFound] = useState(false);
+  const [totalDetections, setTotalDetections] = useState(0);
+  const [currentPage, setCurrentPage] = useState<string>(''); // Track the current page manually
+  const [hasShownFirstDetectionNotification, setHasShownFirstDetectionNotification] = useState(false);
+  const [hasShownCompletionNotification, setHasShownCompletionNotification] = useState(false);
 
   const api = axios.create({
     baseURL: 'http://localhost:5000',
   });
+
+  // Show notification when first detection is found, but only once and not on /realtime
+  useEffect(() => {
+    if (
+      firstDetectionFound &&
+      currentPage !== '/realtime' &&
+      !hasShownFirstDetectionNotification
+    ) {
+      toast.info('First detection found!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      setHasShownFirstDetectionNotification(true);
+    }
+  }, [firstDetectionFound, currentPage, hasShownFirstDetectionNotification]);
+
+  // Show notification when analysis is complete, but only once and not on /realtime
+  useEffect(() => {
+    if (
+      totalDetections > 0 &&
+      currentPage !== '/realtime' &&
+      !hasShownCompletionNotification
+    ) {
+      toast.success(`All real-time image analysis completed. Total detections: ${totalDetections}`, {
+        position: 'top-right',
+        autoClose: 5000,
+      });
+      setHasShownCompletionNotification(true);
+    }
+  }, [totalDetections, currentPage, hasShownCompletionNotification]);
 
   const addDetection = (detection: Detection) => {
     setDetections((prev) => [...prev, detection]);
@@ -115,7 +157,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
           processedUrl: imageDetails.annotated_url,
           detections: imageDetails.detections.map((det: any) => ({
             ...det,
-            segmentation: det.segmentation, // Map the segmentation data
+            segmentation: det.segmentation,
           })),
           dateProcessed: imageDetails.processed_at,
           confidence: avgConfidence,
@@ -175,7 +217,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
             status: 'complete',
             detections: imageDetails.detections.map((det: any) => ({
               ...det,
-              segmentation: det.segmentation, // Map the segmentation data
+              segmentation: det.segmentation,
             })),
           };
         })
@@ -258,6 +300,13 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
     setProcessingProgress(0);
     setActiveImageId(null);
     setUploadedFiles([]);
+    setFirstDetectionFound(false);
+    setTotalDetections(0);
+  };
+
+  const resetNotifications = () => {
+    setHasShownFirstDetectionNotification(false);
+    setHasShownCompletionNotification(false);
   };
 
   useEffect(() => {
@@ -278,6 +327,12 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
     processedImages,
     activeImageId,
     uploadedFiles,
+    firstDetectionFound,
+    totalDetections,
+    currentPage,
+    setCurrentPage,
+    setFirstDetectionFound,
+    setTotalDetections,
     setUploadedFiles,
     addDetection,
     removeDetection,
@@ -293,6 +348,7 @@ export const AppContextProvider = ({ children }: { children: ReactNode }) => {
     fetchHistory,
     resetProcessingState,
     deleteImage,
+    resetNotifications,
   };
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;

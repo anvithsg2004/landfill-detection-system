@@ -16,11 +16,14 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
   const location = useLocation();
+  const pathname = location.pathname;
 
   const navigationItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
     { name: 'Upload', path: '/upload', icon: <Upload size={20} /> },
     { name: 'Detection History', path: '/history', icon: <Clock size={20} /> },
+    { name: 'Real Time Analysis', path: '/realtime', icon: <BarChart2 size={20} /> },
+    { name: 'Try Demo', path: '/demo', icon: <GanttChart size={20} /> }
   ];
 
   const additionalLinks = [
@@ -63,6 +66,7 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
               <li key={item.name}>
                 <Link
                   to={item.path}
+                  onClick={() => toggleSidebar()}
                   className={`flex items-center space-x-2 px-4 py-2.5 rounded-md transition-colors ${isActive(item.path)
                     ? 'bg-primary-600 text-white'
                     : 'text-neutral-100 hover:bg-primary-400'
