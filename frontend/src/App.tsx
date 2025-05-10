@@ -14,6 +14,8 @@ import RealTimePage from './pages/RealTimePage/RealTimePage';
 import RegisterPage from './pages/Auth/RegisterPage';
 import ProfilePage from './pages/Profile/ProfilePage';
 import DemoPage from '../src/pages/DemoPage/DemoPage';
+import IntroPage from '../src/pages/Intro/IntroPage';
+import RealTimeAnalysis from '../src/pages/RealTimePage/RealTimePage';
 import { AppContextProvider, useAppContext } from './context/AppContext';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -59,12 +61,14 @@ function App() {
           />
           <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/intro" element={<IntroPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/analysis/:id" element={<AnalysisPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/realtime" element={<RealTimePage />} />
             <Route path="/demo" element={<DemoPage />} />
+            <Route path="/realtime" element={<RealTimeAnalysis />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

@@ -7,12 +7,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 interface HistoryTableProps {
   historyItems: HistoryItem[];
+  onDeleteSuccess: (deletedItemId: string) => void;
 }
 
 type SortField = 'fileName' | 'dateProcessed' | 'detectionCount' | 'confidence';
 type SortOrder = 'asc' | 'desc';
 
-// Define variants for the disintegration effect
 const rowVariants = {
   initial: { opacity: 1, scale: 1, filter: 'blur(0px)' },
   exit: {
@@ -20,13 +20,12 @@ const rowVariants = {
     scale: 0.95,
     filter: 'blur(3px)',
     transition: {
-      duration: 1, // Slower duration for a dramatic effect
-      staggerChildren: 0.1, // Stagger the child animations
+      duration: 1,
+      staggerChildren: 0.1,
     },
   },
 };
 
-// Define variants for table cells to simulate particle dispersion
 const cellVariants = {
   initial: { opacity: 1, x: 0, y: 0 },
   exit: {
@@ -35,7 +34,7 @@ const cellVariants = {
   },
 };
 
-const HistoryTable = ({ historyItems }: HistoryTableProps) => {
+const HistoryTable = ({ historyItems, onDeleteSuccess }: HistoryTableProps) => {
   const { deleteImage } = useAppContext();
   const navigate = useNavigate();
   const [sortField, setSortField] = useState<SortField>('dateProcessed');
@@ -46,6 +45,7 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
   const [filterConfidenceMax, setFilterConfidenceMax] = useState<number>(100);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -54,6 +54,13 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
       setSortField(field);
       setSortOrder('desc');
     }
+  };
+
+  const resetFilters = () => {
+    setFilterStatus('');
+    setFilterConfidenceMin(0);
+    setFilterConfidenceMax(100);
+    setShowFilter(false);
   };
 
   const applyFilters = (items: HistoryItem[]) => {
@@ -72,16 +79,41 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
   };
 
   const confirmDelete = async () => {
-    if (itemToDelete) {
+    if (!itemToDelete) return;
+
+    setIsDeleting(true);
+    setShowDeleteModal(false);
+
+    try {
       await deleteImage(itemToDelete);
-      setShowDeleteModal(false);
+      onDeleteSuccess(itemToDelete); // Notify parent of successful deletion
       setItemToDelete(null);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        console.error('Unauthorized access - redirecting to login');
+        window.dispatchEvent(new Event('unauthorized'));
+      } else {
+        console.error('Error deleting image:', err);
+        alert('Failed to delete image. Please try again.');
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setItemToDelete(null);
+  };
+
+  const handleConfidenceMinChange = (value: number) => {
+    const newValue = Math.max(0, Math.min(value, filterConfidenceMax, 100));
+    setFilterConfidenceMin(newValue);
+  };
+
+  const handleConfidenceMaxChange = (value: number) => {
+    const newValue = Math.min(100, Math.max(value, filterConfidenceMin, 0));
+    setFilterConfidenceMax(newValue);
   };
 
   const sortedItems = applyFilters([...historyItems]).sort((a, b) => {
@@ -168,7 +200,7 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
                   <input
                     type="number"
                     value={filterConfidenceMin}
-                    onChange={(e) => setFilterConfidenceMin(Number(e.target.value))}
+                    onChange={(e) => handleConfidenceMinChange(Number(e.target.value))}
                     min={0}
                     max={100}
                     placeholder="Min"
@@ -178,7 +210,7 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
                   <input
                     type="number"
                     value={filterConfidenceMax}
-                    onChange={(e) => setFilterConfidenceMax(Number(e.target.value))}
+                    onChange={(e) => handleConfidenceMaxChange(Number(e.target.value))}
                     min={0}
                     max={100}
                     placeholder="Max"
@@ -186,6 +218,12 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
                   />
                 </div>
               </div>
+              <button
+                onClick={resetFilters}
+                className="w-full p-2 text-sm text-neutral-600 bg-neutral-200 hover:bg-neutral-300 rounded-md transition-colors duration-200"
+              >
+                Reset Filters
+              </button>
             </div>
           )}
         </div>
@@ -265,7 +303,6 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
         <tbody>
           <AnimatePresence>
             {sortedItems.map((item) => {
-              // Precompute random x and y offsets for each cell
               const cellExitProps = {
                 x: Math.random() > 0.5 ? Math.random() * 20 : -Math.random() * 20,
                 y: Math.random() > 0.5 ? Math.random() * 10 : -Math.random() * 10,
@@ -349,10 +386,18 @@ const HistoryTable = ({ historyItems }: HistoryTableProps) => {
                     </Link>
                     <button
                       onClick={() => handleDeleteClick(item.id)}
-                      className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-error hover:bg-error-dark rounded-md transition-colors duration-200"
+                      disabled={isDeleting}
+                      className={`inline-flex items-center px-3 py-1 text-sm font-medium text-white rounded-md transition-colors duration-200 ${isDeleting
+                        ? 'bg-error opacity-50 cursor-not-allowed'
+                        : 'bg-error hover:bg-error-dark'
+                        }`}
                     >
-                      <Trash2 size={14} className="mr-1" />
-                      <span>Delete</span>
+                      {isDeleting && item.id === itemToDelete ? (
+                        <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-1"></div>
+                      ) : (
+                        <Trash2 size={14} className="mr-1" />
+                      )}
+                      <span>{isDeleting && item.id === itemToDelete ? 'Deleting...' : 'Delete'}</span>
                     </button>
                   </motion.td>
                 </motion.tr>

@@ -8,11 +8,22 @@ const UploadPage = () => {
   const { processingStatus, processingProgress, activeImageId, resetProcessingState } = useAppContext();
   const navigate = useNavigate();
 
-  // Navigate to analysis page when processing completes
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      console.log('Unauthorized event detected, redirecting to login from UploadPage');
+      navigate('/login');
+    };
+
+    window.addEventListener('unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('unauthorized', handleUnauthorized);
+    };
+  }, [navigate]);
+
   useEffect(() => {
     if (processingStatus === 'complete' && activeImageId) {
       navigate(`/analysis/${activeImageId}`, { replace: false });
-      resetProcessingState(); // Reset state after redirection
+      resetProcessingState();
     }
   }, [processingStatus, activeImageId, navigate, resetProcessingState]);
 

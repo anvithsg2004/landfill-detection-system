@@ -6,10 +6,12 @@ import { toast } from 'react-toastify';
 import { ProcessedImage, Detection } from '../../types';
 import ImageViewer from '../../components/Analysis/ImageViewer';
 import DetectionList from '../../components/Analysis/DetectionList';
+import { useAppContext } from '../../context/AppContext';
 
 const AnalysisPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAppContext(); // Get user from context
   const [currentImage, setCurrentImage] = useState<ProcessedImage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,12 +19,32 @@ const AnalysisPage = () => {
   const [classes, setClasses] = useState<string[]>([]);
 
   useEffect(() => {
+    const handleUnauthorized = () => {
+      console.log('Unauthorized event detected, redirecting to login from AnalysisPage');
+      navigate('/login');
+    };
+
+    window.addEventListener('unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('unauthorized', handleUnauthorized);
+    };
+  }, [navigate]);
+
+  useEffect(() => {
     const fetchImageDetails = async () => {
+      // If user is not authenticated, redirect to login
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       try {
-        const response = await axios.get(`http://localhost:5000/images/${id}`);
+        const response = await axios.get(`http://localhost:5000/images/${id}`, {
+          withCredentials: true, // Keep withCredentials for CORS
+        });
         const imageDetails = response.data;
 
         console.log('Fetched Image Details:', imageDetails);
@@ -41,11 +63,11 @@ const AnalysisPage = () => {
         const processedImage: ProcessedImage = {
           id: imageDetails.id,
           fileName: imageDetails.filename,
-          originalUrl: imageDetails.original_url, // Map original_url to originalUrl
-          processedUrl: imageDetails.annotated_url, // Map annotated_url to processedUrl
+          originalUrl: imageDetails.original_url,
+          processedUrl: imageDetails.annotated_url,
           detections: imageDetails.detections.map((det: any) => ({
             ...det,
-            segmentation: det.segmentation, // Ensure segmentation is mapped
+            segmentation: det.segmentation,
           })),
           dateProcessed: imageDetails.processed_at,
           confidence: avgConfidence,
@@ -53,7 +75,6 @@ const AnalysisPage = () => {
 
         setCurrentImage(processedImage);
 
-        // Extract unique classes from detections
         if (imageDetails.detections) {
           const uniqueClasses = Array.from(
             new Set(imageDetails.detections.map((d: Detection) => d.type))
@@ -61,8 +82,13 @@ const AnalysisPage = () => {
           setClasses(uniqueClasses);
         }
       } catch (err) {
-        setError('Failed to load image details. Please try again.');
-        console.error('Error fetching image details:', err);
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+          console.error('Unauthorized access - redirecting to login');
+          window.dispatchEvent(new Event('unauthorized'));
+        } else {
+          setError('Failed to load image details. Please try again.');
+          console.error('Error fetching image details:', err);
+        }
       } finally {
         setLoading(false);
       }
@@ -71,7 +97,7 @@ const AnalysisPage = () => {
     if (id) {
       fetchImageDetails();
     }
-  }, [id]);
+  }, [id, navigate, user]); // Add user to dependencies
 
   const exportResults = () => {
     if (!currentImage) return;
@@ -96,10 +122,11 @@ const AnalysisPage = () => {
         'Latitude',
         'Longitude',
         'Date Detected',
-        'Bounding Box TopLeft Lat',
-        'Bounding Box TopLeft Lng',
-        'Bounding Box BottomRight Lat',
-        'Bounding Box BottomRight Lng',
+        'Bounding Box TopLeft X',
+        'Bounding Box TopLeft Y',
+        'Bounding Box BottomRight X',
+        'Bounding Box BottomRight Y',
+        'Segmentation Coordinates',
       ],
     ];
 
@@ -115,14 +142,15 @@ const AnalysisPage = () => {
       d.location.lat,
       d.location.lng,
       new Date(d.dateDetected).toLocaleDateString(),
-      d.boundingBox.topLeft.lat,
-      d.boundingBox.topLeft.lng,
-      d.boundingBox.bottomRight.lat,
-      d.boundingBox.bottomRight.lng,
+      d.boundingBox.topLeft.x,
+      d.boundingBox.topLeft.y,
+      d.boundingBox.bottomRight.x,
+      d.boundingBox.bottomRight.y,
+      d.segmentation && d.segmentation[0] ? d.segmentation[0].join(';') : '',
     ]);
 
     const csvContent = [...imageMetadata, ...detectionsHeader, ...detectionsData]
-      .map((row) => row.join(','))
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
       .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -212,7 +240,6 @@ const AnalysisPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-        {/* Class Filter Sidebar */}
         <div className="lg:col-span-1 bg-primary-50 p-4 rounded-md border border-neutral-200">
           <h3 className="text-lg font-semibold text-primary-500 mb-4">Detection Classes</h3>
           <div className="space-y-2">
@@ -241,7 +268,7 @@ const AnalysisPage = () => {
         </div>
 
         <div className="lg:col-span-2 h-full flex flex-col">
-          <ImageViewer processedImage={currentImage} setSelectedClass={setSelectedClass} />
+          <ImageViewer processedImage={currentImage} />
         </div>
 
         <div className="flex flex-col">

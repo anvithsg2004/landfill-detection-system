@@ -1,0 +1,97 @@
+{
+  "image": "WIN_20250221_14_25_22_Pro.jpg",
+  "width": 571,
+  "height": 720,
+  "categories": [
+    {
+      "id": 0,
+      "name": "Rubble/excavated earth and rocks"
+    },
+    {
+      "id": 1,
+      "name": "Bulky items"
+    },
+    {
+      "id": 2,
+      "name": "Fire Wood"
+    },
+    {
+      "id": 3,
+      "name": "Scrap"
+    },
+    {
+      "id": 4,
+      "name": "Plastic"
+    },
+    {
+      "id": 5,
+      "name": "Vehicles"
+    },
+    {
+      "id": 6,
+      "name": "Tires"
+    },
+    {
+      "id": 7,
+      "name": "Domestic appliances"
+    },
+    {
+      "id": 8,
+      "name": "Paper"
+    },
+    {
+      "id": 9,
+      "name": "Sludge-Zootechnical waste-Manure"
+    },
+    {
+      "id": 10,
+      "name": "Foundry waste"
+    },
+    {
+      "id": 11,
+      "name": "Stone/marble processing waste"
+    },
+    {
+      "id": 12,
+      "name": "Asphalt milling"
+    },
+    {
+      "id": 13,
+      "name": "Corrugated sheets (presumed asbestos-cement)"
+    },
+    {
+      "id": 14,
+      "name": "Glass"
+    },
+    {
+      "id": 15,
+      "name": "Heaps not delimited"
+    },
+    {
+      "id": 16,
+      "name": "Full container"
+    },
+    {
+      "id": 17,
+      "name": "Big bags"
+    },
+    {
+      "id": 18,
+      "name": "Full pallets"
+    },
+    {
+      "id": 19,
+      "name": "Delimited heaps (by barriers/walls/etc)"
+    },
+    {
+      "id": 20,
+      "name": "Cisterns"
+    },
+    {
+      "id": 21,
+      "name": "Drums bins"
+    }
+  ],
+  "annotations": [],
+  "scaling_factor": 1.0
+}

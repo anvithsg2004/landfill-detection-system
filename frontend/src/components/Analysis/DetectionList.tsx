@@ -7,7 +7,6 @@ interface DetectionListProps {
 
 const DetectionList = ({ detections }: DetectionListProps) => {
   const getTypeColor = (type: string) => {
-    // Map the API's type (e.g., "FULL container") to your frontend's type values
     const normalizedType = type.toLowerCase().includes('full') ? 'active' : 'potential';
     switch (normalizedType) {
       case 'active':
