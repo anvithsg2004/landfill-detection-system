@@ -19,11 +19,15 @@ import logging
 
 # Flask app setup
 app = Flask(__name__)
-CORS(app, resources={r"/*": {
-    "origins": "http://localhost:5173",
-    "supports_credentials": True,
-    "allow_headers": ["*"]
-}})
+# Set allowed origins based on environment variable or default to local
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+CORS(app, resources={
+    r"/*": {
+        "origins": FRONTEND_URL,
+        "supports_credentials": True,
+        "allow_headers": ["*"]
+    }
+})
 auth = HTTPBasicAuth()
 
 # Configuration
