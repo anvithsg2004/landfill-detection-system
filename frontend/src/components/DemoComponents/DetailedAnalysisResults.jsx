@@ -38,21 +38,21 @@ const DetailedAnalysisResults = ({ results }) => {
                 <h2 className="text-xl font-semibold">Detailed Analysis Results</h2>
                 <div className="flex space-x-2">
                     <motion.button
-                        className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+                        className="p-2 text-gray-500 hover:text-[#303c54] hover:bg-[#303c54]/10 rounded-full transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                     >
                         <FiDownload size={18} />
                     </motion.button>
                     <motion.button
-                        className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+                        className="p-2 text-gray-500 hover:text-[#303c54] hover:bg-[#303c54]/10 rounded-full transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                     >
                         <FiShare2 size={18} />
                     </motion.button>
                     <motion.button
-                        className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+                        className="p-2 text-gray-500 hover:text-[#303c54] hover:bg-[#303c54]/10 rounded-full transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                     >
@@ -104,9 +104,9 @@ const DetailedAnalysisResults = ({ results }) => {
                             className="px-4 py-3 border-t border-gray-200"
                         >
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                <div className="bg-blue-50 rounded-lg p-3 text-center border border-blue-100">
+                                <div className="bg-[#303c54]/10 rounded-lg p-3 text-center border border-[#303c54]/20">
                                     <div className="text-xs text-gray-500 mb-1">Detection Class</div>
-                                    <div className="text-xl font-semibold text-blue-500">{analysisData.performance.detectionClass}</div>
+                                    <div className="text-xl font-semibold text-[#303c54]">{analysisData.performance.detectionClass}</div>
                                 </div>
 
                                 <div className="bg-green-50 rounded-lg p-3 text-center border border-green-100">

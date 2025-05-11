@@ -93,7 +93,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
             <div className="bg-gray-50 rounded-lg border border-gray-100 p-5 mb-4">
                 {detectionState === 'idle' && (
                     <div className="text-center py-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-500 mb-4">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#303c54]/20 text-[#303c54] mb-4">
                             <FiSearch size={32} />
                         </div>
                         <h3 className="text-xl font-medium text-gray-800 mb-3">Ready to Begin Detection</h3>
@@ -103,11 +103,12 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                                 : 'The automated detection system is ready to analyze your images for any suspicious activities or anomalies.'}
                         </p>
                         <motion.button
-                            className={`px-6 py-3 transition-colors font-medium rounded-lg ${images.length > 0
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                            className={`px-6 py-3 transition-colors font-medium rounded-lg text-white ${images.length > 0
+                                ? ''
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 }`}
-                            whileHover={images.length > 0 ? { scale: 1.03 } : {}}
+                            style={images.length > 0 ? { backgroundColor: '#303c54' } : {}}
+                            whileHover={images.length > 0 ? { scale: 1.03, backgroundColor: '#3b4a66' } : {}}
                             whileTap={images.length > 0 ? { scale: 0.98 } : {}}
                             onClick={images.length > 0 ? startDetection : undefined}
                             disabled={images.length === 0}
@@ -129,7 +130,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                         {/* Progress indicator */}
                         <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
                             <motion.div
-                                className="bg-blue-500 h-2 rounded-full"
+                                className="bg-[#303c54] h-2 rounded-full"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${progress}%` }}
                                 transition={{ duration: 0.3 }}
@@ -148,7 +149,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                                                 className={`w-10 h-10 rounded-full flex items-center justify-center ${step.status === 'complete'
                                                     ? 'bg-green-100 text-green-500'
                                                     : step.status === 'current'
-                                                        ? 'bg-blue-100 text-blue-500'
+                                                        ? 'bg-[#303c54]/20 text-[#303c54]'
                                                         : 'bg-gray-100 text-gray-400'
                                                     }`}
                                                 animate={step.status === 'current' ? { scale: [1, 1.1, 1] } : {}}
@@ -159,7 +160,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                                             <span className={`text-xs mt-2 font-medium ${step.status === 'complete'
                                                 ? 'text-green-500'
                                                 : step.status === 'current'
-                                                    ? 'text-blue-500'
+                                                    ? 'text-[#303c54]'
                                                     : 'text-gray-400'
                                                 }`}>
                                                 {step.name}
@@ -213,7 +214,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                             <div className="flex space-x-4">
                                 <button
                                     className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'overview'
-                                        ? 'text-blue-500 border-b-2 border-blue-500'
+                                        ? 'text-[#303c54] border-b-2 border-[#303c54]'
                                         : 'text-gray-500 hover:text-gray-800'
                                         }`}
                                     onClick={() => setActiveTab('overview')}
@@ -222,7 +223,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                                 </button>
                                 <button
                                     className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'regions'
-                                        ? 'text-blue-500 border-b-2 border-blue-500'
+                                        ? 'text-[#303c54] border-b-2 border-[#303c54]'
                                         : 'text-gray-500 hover:text-gray-800'
                                         }`}
                                     onClick={() => setActiveTab('regions')}
@@ -231,7 +232,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                                 </button>
                                 <button
                                     className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'confidence'
-                                        ? 'text-blue-500 border-b-2 border-blue-500'
+                                        ? 'text-[#303c54] border-b-2 border-[#303c54]'
                                         : 'text-gray-500 hover:text-gray-800'
                                         }`}
                                     onClick={() => setActiveTab('confidence')}
@@ -254,7 +255,7 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                                 >
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                                         <div className="bg-white rounded-lg p-4 border border-gray-200 flex items-center">
-                                            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mr-4">
+                                            <div className="w-12 h-12 rounded-full bg-[#303c54]/20 text-[#303c54] flex items-center justify-center mr-4">
                                                 <FiSearch size={24} />
                                             </div>
                                             <div>
@@ -476,8 +477,9 @@ const AutomatedDetection = ({ onDetectionComplete, images = [] }) => {
                             An error occurred during the detection process. Please try again or contact support if the issue persists.
                         </p>
                         <motion.button
-                            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
-                            whileHover={{ scale: 1.03 }}
+                            className="px-6 py-3 text-white rounded-lg transition-colors font-medium"
+                            style={{ backgroundColor: '#303c54' }}
+                            whileHover={{ scale: 1.03, backgroundColor: '#3b4a66' }}
                             whileTap={{ scale: 0.98 }}
                             onClick={resetDetection}
                         >

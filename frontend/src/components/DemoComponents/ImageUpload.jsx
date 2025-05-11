@@ -130,7 +130,7 @@ const ImageUpload = ({ onImagesUploaded }) => {
             {/* Upload Area */}
             <div
                 className={`border-2 border-dashed rounded-lg p-8 mb-6 transition-colors flex flex-col items-center justify-center cursor-pointer
-          ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400 bg-gray-50'}`}
+          ${dragActive ? 'border-[#303c54] bg-[#303c54]/10' : 'border-gray-300 hover:border-gray-400 bg-gray-50'}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
@@ -154,7 +154,7 @@ const ImageUpload = ({ onImagesUploaded }) => {
                     transition={{ duration: 0.2 }}
                 >
                     <motion.div
-                        className="mx-auto mb-4 p-4 bg-blue-100 text-blue-500 rounded-full inline-flex"
+                        className="mx-auto mb-4 p-4 bg-[#303c54]/20 text-[#303c54] rounded-full inline-flex"
                         animate={{
                             y: [0, -10, 0],
                             transition: { repeat: dragActive ? Infinity : 0, duration: 1 }
@@ -167,7 +167,11 @@ const ImageUpload = ({ onImagesUploaded }) => {
                     </h3>
                     <p className="text-gray-500 text-sm mb-3">or</p>
                     <button
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors text-sm font-medium"
+                        className="px-4 py-2 text-white rounded-md transition-colors text-sm font-medium"
+                        style={{
+                            backgroundColor: '#303c54',
+                            ':hover': { backgroundColor: '#3b4a66' }
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         Browse Files
@@ -230,7 +234,7 @@ const ImageUpload = ({ onImagesUploaded }) => {
                                     {image.status === 'uploading' && (
                                         <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
                                             <div
-                                                className="bg-blue-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+                                                className="bg-[#303c54] h-1.5 rounded-full transition-all duration-300 ease-out"
                                                 style={{ width: `${uploadProgress[image.id] || 0}%` }}
                                             ></div>
                                         </div>

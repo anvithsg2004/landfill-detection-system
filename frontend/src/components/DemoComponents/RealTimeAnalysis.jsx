@@ -42,7 +42,7 @@ const RealTimeAnalysis = () => {
                 { type: 'warning', message: 'Failed login attempt', source: 'Auth' },
                 { type: 'warning', message: 'Slow database query detected', source: 'Database' },
                 { type: 'error', message: 'Network connection lost', source: 'Network' },
-                { type: 'error', message: 'API endpoint unreachable', source: 'API' },
+                { type: 'error', message: 'API orpoint unreachable', source: 'API' },
                 { type: 'error', message: 'Suspicious activity detected', source: 'Security' }
             ];
 
@@ -200,7 +200,7 @@ const RealTimeAnalysis = () => {
                 <div className="flex space-x-6">
                     <button
                         className={`py-2 px-1 text-sm font-medium border-b-2 ${activeSection === 'overview'
-                            ? 'border-blue-500 text-blue-600'
+                            ? 'border-[#303c54] text-[#303c54]'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                         onClick={() => setActiveSection('overview')}
@@ -209,7 +209,7 @@ const RealTimeAnalysis = () => {
                     </button>
                     <button
                         className={`py-2 px-1 text-sm font-medium border-b-2 ${activeSection === 'events'
-                            ? 'border-blue-500 text-blue-600'
+                            ? 'border-[#303c54] text-[#303c54]'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                         onClick={() => setActiveSection('events')}
@@ -218,7 +218,7 @@ const RealTimeAnalysis = () => {
                     </button>
                     <button
                         className={`py-2 px-1 text-sm font-medium border-b-2 ${activeSection === 'performance'
-                            ? 'border-blue-500 text-blue-600'
+                            ? 'border-[#303c54] text-[#303c54]'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                         onClick={() => setActiveSection('performance')}
@@ -630,7 +630,7 @@ const RealTimeAnalysis = () => {
                         animate={{ opacity: 1, y: 0, x: '-50%' }}
                         exit={{ opacity: 0, y: 50, x: '-50%' }}
                         transition={{ duration: 0.3 }}
-                        className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg flex items-center z-50 max-w-md w-full ${notificationData.type === 'error' ? 'bg-red-100 border border-red-200' : 'bg-yellow-100 border border-yellow-200'
+                        className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg flex items-center z-50 max-w-md w-full ${notificationData.type === 'error' ? 'bg-red-100 border-red-200' : 'bg-yellow-100 border-yellow-200'
                             }`}
                     >
                         <div className="mr-3 flex-shrink-0">

@@ -106,15 +106,16 @@ current_api_key = None
 # Authentication setup
 @auth.verify_password
 def verify_password(email, password):
-    print(f"Verifying credentials: email={email}, password={password}")
+    # print(f"Verifying credentials: email={email}, password={password}")
     user = users_collection.find_one({"email": email})
     if user:
-        print(f"User found: {user}")
+        # print(f"User found: {user}")
         if user["password"] == password:
-            print("Authentication successful")
+            # print("Authentication successful")
             return email
         else:
-            print(f"Password mismatch: stored={user['password']}, provided={password}")
+            # print(f"Password mismatch: stored={user['password']}, provided={password}")
+            return False
     else:
         print(f"User not found for email: {email}")
     return None

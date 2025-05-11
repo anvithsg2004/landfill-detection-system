@@ -20,147 +20,139 @@ interface ImageEntry {
 const RealTimePage = () => {
     const {
         setCurrentPage,
+        processingStatus,
         isRealTimeAnalysisRunning,
         startRealTimeAnalysis,
-        processedImages,
-        processingStatus,
-        user,
-        isUserLoading,
     } = useAppContext();
     const navigate = useNavigate();
-    const [imageList, setImageList] = useState<string[]>([]);
+
+    // Persist the same API key for the life of the tab
+    const [apiKey] = useState<string>(() => {
+        const existing = sessionStorage.getItem('realtimeApiKey');
+        if (existing) return existing;
+        const fresh = uuidv4();
+        sessionStorage.setItem('realtimeApiKey', fresh);
+        return fresh;
+    });
+
+    // Persist last-selected image
+    const [selectedImage, setSelectedImage] = useState<ProcessedImage | null>(() => {
+        const json = sessionStorage.getItem('selectedRealtimeImage');
+        return json ? JSON.parse(json) : null;
+    });
+
+    // Persist the session’s list of images
+    const [currentSessionImages, setCurrentSessionImages] = useState<ProcessedImage[]>(() => {
+        const saved = sessionStorage.getItem('sessionImages');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const [imageList, setImageList] = useState<string[]>(() => {
+        const saved = sessionStorage.getItem('sessionImageList');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [error, setError] = useState<string | null>(null);
-    const [apiKey, setApiKey] = useState<string>('');
-    const [selectedImage, setSelectedImage] = useState<ProcessedImage | null>(null);
     const [loading, setLoading] = useState(false);
     const [selectedClass, setSelectedClass] = useState<string | null>(null);
     const [classes, setClasses] = useState<string[]>([]);
-    const [currentSessionImages, setCurrentSessionImages] = useState<ProcessedImage[]>([]);
 
-    // Generate random API key on mount
+    // Handle unauthorized globally
     useEffect(() => {
-        const newApiKey = uuidv4();
-        setApiKey(newApiKey);
-    }, []);
-
-    // Handle unauthorized events
-    useEffect(() => {
-        const handleUnauthorized = () => {
-            console.log('Unauthorized event detected, redirecting to login from RealTimePage');
-            navigate('/login');
-        };
-
-        window.addEventListener('unauthorized', handleUnauthorized);
-        return () => {
-            window.removeEventListener('unauthorized', handleUnauthorized);
-        };
+        const onUnauth = () => navigate('/login');
+        window.addEventListener('unauthorized', onUnauth);
+        return () => window.removeEventListener('unauthorized', onUnauth);
     }, [navigate]);
 
-    // Set the current page
+    // Mark this page as active
     useEffect(() => {
         setCurrentPage('/realtime');
-        return () => {
-            setCurrentPage('');
-        };
+        return () => setCurrentPage('');
     }, [setCurrentPage]);
 
-    // Start real-time analysis with the random API key
+    // Kick off the real-time stream exactly once
     useEffect(() => {
-        if (!apiKey) return;
-
-        const startAnalysis = async () => {
+        if (!apiKey || isRealTimeAnalysisRunning) return;
+        ; (async () => {
             try {
-                const response = await axios.get('http://localhost:5000/realtime-status', {
-                    withCredentials: true,
-                });
-                if (!response.data.isRunning) {
+                const status = await axios.get('http://localhost:5000/realtime-status', { withCredentials: true });
+                if (!status.data.isRunning) {
                     await axios.post(
                         'http://localhost:5000/realtime',
                         { apiKey },
                         { withCredentials: true }
                     );
-                    startRealTimeAnalysis(); // Update context
-                    console.log('Real-time analysis started with API key:', apiKey);
+                    startRealTimeAnalysis();
                 }
-            } catch (err) {
+            } catch (e) {
                 setError('Failed to start real-time analysis.');
-                console.error('Error starting real-time analysis:', err);
-                toast.error('Failed to start real-time analysis.', {
-                    position: 'top-right',
-                    autoClose: 3000,
-                });
+                toast.error('Failed to start real-time analysis.', { position: 'top-right', autoClose: 3000 });
             }
-        };
+        })();
+    }, [apiKey, isRealTimeAnalysisRunning, startRealTimeAnalysis]);
 
-        startAnalysis();
-    }, [apiKey, startRealTimeAnalysis]);
-
-    // Update the fetchImageList function
+    // Fetch & dedupe session images, then persist
     const fetchImageList = useCallback(async () => {
         try {
-            const response = await axios.get('http://localhost:5000/images-list', {
-                withCredentials: true,
-            });
+            const resp = await axios.get('http://localhost:5000/images-list', { withCredentials: true });
+            const filenames = Array.from(new Set(resp.data.images as string[]));
 
-            // Fetch details for each image in the list
-            const imagesWithDetails = await Promise.all(
-                response.data.images.map(async (filename: string) => {
+            const details = await Promise.all(
+                filenames.map(async (fn) => {
                     try {
-                        const imagesResponse = await axios.get('http://localhost:5000/images', {
-                            withCredentials: true,
-                        });
-                        const imageEntry = imagesResponse.data.find(
-                            (img: ImageEntry) => img.filename === filename && img.source === 'realtime'
+                        const imgs = await axios.get('http://localhost:5000/images', { withCredentials: true });
+                        const entry: ImageEntry | undefined = imgs.data.find(
+                            (i: ImageEntry) => i.filename === fn && i.source === 'realtime'
                         );
+                        if (!entry) return null;
 
-                        if (!imageEntry) return null;
-
-                        const detailsResponse = await axios.get(
-                            `http://localhost:5000/realtime-images/${imageEntry.id}`,
+                        const det = await axios.get(
+                            `http://localhost:5000/realtime-images/${entry.id}`,
                             { withCredentials: true }
                         );
-
-                        const imageDetails = detailsResponse.data;
-                        const detectionConfidences = imageDetails.detections.map((d: Detection) => d.confidence);
-                        const avgConfidence = detectionConfidences.length > 0
-                            ? detectionConfidences.reduce((sum, conf) => sum + conf, 0) / detectionConfidences.length
+                        const data = det.data;
+                        const creds = data.detections.map((d: Detection) => d.confidence);
+                        const avg = creds.length
+                            ? creds.reduce((s, c) => s + c, 0) / creds.length
                             : 0;
 
                         return {
-                            id: imageDetails.id,
-                            fileName: imageDetails.filename,
-                            originalUrl: imageDetails.original_url,
-                            processedUrl: imageDetails.annotated_url,
-                            detections: imageDetails.detections,
-                            dateProcessed: imageDetails.processed_at,
-                            confidence: avgConfidence,
-                        };
-                    } catch (error) {
-                        console.error('Error fetching image details:', error);
+                            id: data.id,
+                            fileName: data.filename,
+                            originalUrl: data.original_url,
+                            processedUrl: data.annotated_url,
+                            detections: data.detections,
+                            dateProcessed: data.processed_at,
+                            confidence: avg,
+                        } as ProcessedImage;
+                    } catch {
                         return null;
                     }
                 })
             );
 
-            setCurrentSessionImages(imagesWithDetails.filter(Boolean) as ProcessedImage[]);
-            setImageList(response.data.images);
-        } catch (err) {
+            const valid = details.filter((d): d is ProcessedImage => Boolean(d));
+            const unique = valid.reduce<ProcessedImage[]>((acc, img) => {
+                if (!acc.some(x => x.id === img.id)) acc.push(img);
+                return acc;
+            }, []);
+
+            setCurrentSessionImages(unique);
+            sessionStorage.setItem('sessionImages', JSON.stringify(unique));
+            setImageList(filenames);
+            sessionStorage.setItem('sessionImageList', JSON.stringify(filenames));
+        } catch {
             setError('Failed to fetch image list. Please try again.');
-            console.error('Error fetching image list:', err);
         }
     }, []);
 
-    // Poll for image list updates
+    // Poll every 5s
     useEffect(() => {
         fetchImageList();
-        const interval = setInterval(() => {
-            fetchImageList();
-        }, 5000); // Poll every 5 seconds
-
-        return () => clearInterval(interval);
+        const iv = setInterval(fetchImageList, 5000);
+        return () => clearInterval(iv);
     }, [fetchImageList]);
 
-    // Handle image click to show analysis
+    // When user clicks an image name
     const handleImageClick = async (filename: string) => {
         setLoading(true);
         setError(null);
@@ -169,63 +161,52 @@ const RealTimePage = () => {
         setClasses([]);
 
         try {
-            const imagesResponse = await axios.get('http://localhost:5000/images', {
-                withCredentials: true,
-            });
-            const imageEntry = imagesResponse.data.find(
-                (img: ImageEntry) => img.filename === filename && img.source === 'realtime'
+            const imgs = await axios.get('http://localhost:5000/images', { withCredentials: true });
+            const entry: ImageEntry | undefined = imgs.data.find(
+                (i: ImageEntry) => i.filename === filename && i.source === 'realtime'
             );
+            if (!entry) throw new Error('not found');
 
-            if (!imageEntry) {
-                setError('Image not found in database.');
-                console.error('Image not found:', filename);
-                setLoading(false);
-                return;
-            }
-
-            const response = await axios.get(`http://localhost:5000/realtime-images/${imageEntry.id}`, {
+            const res = await axios.get(`http://localhost:5000/realtime-images/${entry.id}`, {
                 withCredentials: true,
             });
-            const imageDetails = response.data;
+            const data = res.data;
+            const creds = data.detections.map((d: Detection) => d.confidence);
+            const avg = creds.length
+                ? creds.reduce((s, c) => s + c, 0) / creds.length
+                : 0;
 
-            const detectionConfidences = imageDetails.detections.map((d: Detection) => d.confidence);
-            const avgConfidence =
-                detectionConfidences.length > 0
-                    ? detectionConfidences.reduce((sum: number, conf: number) => sum + conf, 0) /
-                    detectionConfidences.length
-                    : 0;
-
-            const processedImage: ProcessedImage = {
-                id: imageDetails.id,
-                fileName: imageDetails.filename,
-                originalUrl: imageDetails.original_url,
-                processedUrl: imageDetails.annotated_url,
-                detections: imageDetails.detections,
-                dateProcessed: imageDetails.processed_at,
-                confidence: avgConfidence,
+            const obj: ProcessedImage = {
+                id: data.id,
+                fileName: data.filename,
+                originalUrl: data.original_url,
+                processedUrl: data.annotated_url,
+                detections: data.detections,
+                dateProcessed: data.processed_at,
+                confidence: avg,
             };
+            setSelectedImage(obj);
+            sessionStorage.setItem('selectedRealtimeImage', JSON.stringify(obj));
 
-            setSelectedImage(processedImage);
-
-            if (imageDetails.detections) {
-                const uniqueClasses = Array.from(
-                    new Set(imageDetails.detections.map((d: Detection) => d.type))
-                );
-                setClasses(uniqueClasses);
-            }
-        } catch (err) {
-            if (axios.isAxiosError(err) && err.response?.status === 401) {
-                window.dispatchEvent(new Event('unauthorized'));
-            } else {
-                setError('Failed to load image details.');
-                console.error('Error fetching image details:', err);
-            }
+            const uniq = Array.from(new Set(data.detections.map((d: Detection) => d.type)));
+            setClasses(uniq);
+        } catch {
+            setError('Failed to load image details.');
         } finally {
             setLoading(false);
         }
     };
 
-    // Export analysis results as CSV
+    // Close the detail view
+    const closeAnalysis = () => {
+        setSelectedImage(null);
+        setSelectedClass(null);
+        setClasses([]);
+        setError(null);
+        sessionStorage.removeItem('selectedRealtimeImage');
+    };
+
+    // Export CSV
     const exportResults = () => {
         if (!selectedImage) return;
 
@@ -292,7 +273,6 @@ const RealTimePage = () => {
     // Download JSON annotations
     const downloadJson = async () => {
         if (!selectedImage) return;
-
         try {
             const response = await axios.get(`http://localhost:5000/realtime-images/${selectedImage.id}`, {
                 withCredentials: true,
@@ -333,14 +313,6 @@ const RealTimePage = () => {
             });
     };
 
-    // Close analysis view
-    const closeAnalysis = () => {
-        setSelectedImage(null);
-        setSelectedClass(null);
-        setClasses([]);
-        setError(null);
-    };
-
     return (
         <div className="h-full flex flex-col p-4">
             <div className="flex items-center justify-between mb-6">
@@ -353,7 +325,7 @@ const RealTimePage = () => {
                         </div>
                     )}
                     {isRealTimeAnalysisRunning && (
-                        <div className="w-5 h-5 border-2 border-neutral-600 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-2 border-neutral-600 border-t-transparent rounded-full animate-spin" />
                     )}
                 </div>
             </div>
@@ -365,16 +337,18 @@ const RealTimePage = () => {
             {!selectedImage ? (
                 <div className="flex flex-1 overflow-hidden">
                     <div className="w-1/4 border-r border-neutral-200 p-4 overflow-y-auto">
-                        <h2 className="text-lg font-semibold text-primary-500 mb-4">Current Session Images</h2>
+                        <h2 className="text-lg font-semibold text-primary-500 mb-4">
+                            Current Session Images
+                        </h2>
                         {imageList.length > 0 ? (
                             <ul className="space-y-2">
-                                {imageList.map((image) => (
+                                {imageList.map(name => (
                                     <li
-                                        key={image}
+                                        key={name}
                                         className="p-2 rounded cursor-pointer text-neutral-600 hover:bg-neutral-100"
-                                        onClick={() => handleImageClick(image)}
+                                        onClick={() => handleImageClick(name)}
                                     >
-                                        {image}
+                                        {name}
                                     </li>
                                 ))}
                             </ul>
@@ -388,66 +362,60 @@ const RealTimePage = () => {
                     </div>
 
                     <div className="w-3/4 p-4 overflow-y-auto">
-                        {currentSessionImages.length > 0 ? (
-                            currentSessionImages.map((image) => (
-                                <div key={image.id} className="mb-6">
-                                    <h3 className="text-md font-medium text-neutral-600 mb-2">
-                                        Analyzed Image: {image.fileName}
-                                    </h3>
-                                    {image.detections.length > 0 ? (
-                                        <table className="w-full border-collapse">
-                                            <thead>
-                                                <tr className="bg-primary-50">
-                                                    <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
-                                                        Detection Class
-                                                    </th>
-                                                    <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
-                                                        Location (Lat, Lng)
-                                                    </th>
-                                                    <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
-                                                        Area (m²)
-                                                    </th>
-                                                    <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
-                                                        Confidence
-                                                    </th>
+                        {currentSessionImages.map(img => (
+                            <div key={img.id} className="mb-6">
+                                <h3 className="text-md font-medium text-neutral-600 mb-2">
+                                    Analyzed Image: {img.fileName}
+                                </h3>
+                                {img.detections.length > 0 ? (
+                                    <table className="w-full border-collapse">
+                                        <thead>
+                                            <tr className="bg-primary-50">
+                                                <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
+                                                    Detection Class
+                                                </th>
+                                                <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
+                                                    Location (Lat, Lng)
+                                                </th>
+                                                <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
+                                                    Area (m²)
+                                                </th>
+                                                <th className="p-3 text-left text-sm font-semibold text-primary-500 border-b border-neutral-200">
+                                                    Confidence
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {img.detections.map(d => (
+                                                <tr key={d.id} className="border-b border-neutral-200">
+                                                    <td className="p-3 text-neutral-600">{d.type}</td>
+                                                    <td className="p-3 text-neutral-600">
+                                                        ({d.location.lat.toFixed(2)},{' '}
+                                                        {d.location.lng.toFixed(2)})
+                                                    </td>
+                                                    <td className="p-3 text-neutral-600">{d.area.toFixed(2)}</td>
+                                                    <td className="p-3 text-neutral-600">
+                                                        {(d.confidence * 100).toFixed(0)}%
+                                                    </td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                {image.detections.map((detection) => (
-                                                    <tr key={detection.id} className="border-b border-neutral-200">
-                                                        <td className="p-3 text-neutral-600">{detection.type}</td>
-                                                        <td className="p-3 text-neutral-600">
-                                                            ({detection.location.lat.toFixed(2)},{' '}
-                                                            {detection.location.lng.toFixed(2)})
-                                                        </td>
-                                                        <td className="p-3 text-neutral-600">
-                                                            {detection.area.toFixed(2)}
-                                                        </td>
-                                                        <td className="p-3 text-neutral-600">
-                                                            {(detection.confidence * 100).toFixed(0)}%
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    ) : (
-                                        <p className="text-neutral-600">No detections found in this image.</p>
-                                    )}
-                                </div>
-                            ))
-                        ) : (
-                            processingStatus !== 'processing' && !error && (
-                                <div className="flex-1 flex items-center justify-center">
-                                    <p className="text-neutral-600">
-                                        Waiting for analysis to start...
-                                    </p>
-                                </div>
-                            )
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p className="text-neutral-600">No detections found in this image.</p>
+                                )}
+                            </div>
+                        ))}
+                        {currentSessionImages.length === 0 && processingStatus !== 'processing' && !error && (
+                            <div className="flex-1 flex items-center justify-center">
+                                <p className="text-neutral-600">Waiting for analysis to start...</p>
+                            </div>
                         )}
                     </div>
                 </div>
             ) : (
                 <div className="flex-1 flex flex-col">
+                    {/* Your detailed analysis UI goes here exactly as before */}
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center">
                             <button
@@ -460,35 +428,31 @@ const RealTimePage = () => {
                                 Analysis: {selectedImage.fileName}
                             </h2>
                         </div>
-
                         <div className="flex items-center space-x-3">
                             <button
                                 className="btn btn-outline flex items-center space-x-1.5 text-sm"
                                 onClick={handleShare}
                             >
-                                <Share2 size={16} />
-                                <span>Share</span>
+                                <Share2 size={16} /> <span>Share</span>
                             </button>
                             <button
                                 className="btn btn-outline flex items-center space-x-1.5 text-sm"
                                 onClick={downloadJson}
                             >
-                                <Download size={16} />
-                                <span>Download JSON</span>
+                                <Download size={16} /> <span>Download JSON</span>
                             </button>
                             <button
                                 className="btn btn-primary flex items-center space-x-1.5 text-sm"
                                 onClick={exportResults}
                             >
-                                <Download size={16} />
-                                <span>Export CSV</span>
+                                <Download size={16} /> <span>Export CSV</span>
                             </button>
                         </div>
                     </div>
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-12 flex-1">
-                            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                             <p className="text-neutral-600 mt-4">Loading image details...</p>
                         </div>
                     ) : error ? (
@@ -500,8 +464,11 @@ const RealTimePage = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
+                            {/* Detection Classes sidebar */}
                             <div className="lg:col-span-1 bg-primary-50 p-4 rounded-md border border-neutral-200">
-                                <h3 className="text-lg font-semibold text-primary-500 mb-4">Detection Classes</h3>
+                                <h3 className="text-lg font-semibold text-primary-500 mb-4">
+                                    Detection Classes
+                                </h3>
                                 <div className="space-y-2">
                                     <button
                                         onClick={() => setSelectedClass(null)}
@@ -512,30 +479,32 @@ const RealTimePage = () => {
                                     >
                                         Show All
                                     </button>
-                                    {classes.map((className) => (
+                                    {classes.map(cn => (
                                         <button
-                                            key={className}
-                                            onClick={() => setSelectedClass(className)}
-                                            className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${selectedClass === className
+                                            key={cn}
+                                            onClick={() => setSelectedClass(cn)}
+                                            className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${selectedClass === cn
                                                 ? 'bg-primary-500 text-white'
                                                 : 'text-primary-500 hover:bg-primary-100'
                                                 }`}
                                         >
-                                            {className}
+                                            {cn}
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
+                            {/* Image Viewer */}
                             <div className="lg:col-span-2 h-full flex flex-col">
                                 <ImageViewer processedImage={selectedImage} />
                             </div>
 
+                            {/* Detection List */}
                             <div className="flex flex-col">
                                 <DetectionList
                                     detections={
                                         selectedClass
-                                            ? selectedImage.detections.filter((d) => d.type === selectedClass)
+                                            ? selectedImage.detections.filter(d => d.type === selectedClass)
                                             : selectedImage.detections
                                     }
                                 />

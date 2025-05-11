@@ -73,8 +73,8 @@ const DashboardOverview = () => {
                 {
                     label: 'Detections',
                     data: detectionData,
-                    borderColor: '#0A84FF',
-                    backgroundColor: 'rgba(10, 132, 255, 0.2)',
+                    borderColor: '#303c54',
+                    backgroundColor: 'rgba(48, 60, 84, 0.2)',
                     tension: 0.3,
                 },
                 {
@@ -146,19 +146,22 @@ const DashboardOverview = () => {
                     <h3 className="text-lg font-medium text-gray-800">Performance Overview</h3>
                     <div className="ml-auto space-x-2">
                         <button
-                            className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'daily' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'daily' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            style={activeTab === 'daily' ? { backgroundColor: '#303c54' } : {}}
                             onClick={() => setActiveTab('daily')}
                         >
                             Daily
                         </button>
                         <button
-                            className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'weekly' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'weekly' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            style={activeTab === 'weekly' ? { backgroundColor: '#303c54' } : {}}
                             onClick={() => setActiveTab('weekly')}
                         >
                             Weekly
                         </button>
                         <button
-                            className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'monthly' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'monthly' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            style={activeTab === 'monthly' ? { backgroundColor: '#303c54' } : {}}
                             onClick={() => setActiveTab('monthly')}
                         >
                             Monthly
@@ -169,7 +172,7 @@ const DashboardOverview = () => {
                 <div className="h-64 w-full">
                     {isLoading ? (
                         <div className="h-full w-full flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#303c54]"></div>
                         </div>
                     ) : (
                         chartData && <Line
